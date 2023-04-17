@@ -1,8 +1,9 @@
 const tree = [];
 const findHeadingTagNameList = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
 const semanticTagList = ['SECTION', 'MAIN', 'ASIDE', 'NAV', 'ARTICLE', 'HEADER', 'FOOTER', 'BODY'];
-const actionTagList = ['LI', 'A', 'BUTTON', 'SELECT', 'LABEL', 'INPUT'];
-const findTagNameList = [...semanticTagList, ...actionTagList];
+const gridTagList = ['UL',  'LI', 'FORM']
+const actionTagList = ['A', 'BUTTON', 'SELECT', 'LABEL', 'INPUT', 'TEXTAREA'];
+const findTagNameList = [...semanticTagList, ...gridTagList, ...actionTagList];
 
 
 
