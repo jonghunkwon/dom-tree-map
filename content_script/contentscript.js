@@ -116,14 +116,19 @@ function findChildern(node, findNodeNameList, result) {
 const generateArea = (elementInfo) => {
     const element = elementInfo.target;
     const style = window.getComputedStyle(element);
+    let isSemanticTag = false;
     if (style.display === 'none' || style.visibility === 'hidden') {
         return null;
+    }
+
+    if (semanticTagList.find(item => item === element.tagName)) {
+        isSemanticTag = true;
     }
     const { width, height, top, left } = element.getBoundingClientRect();
     const wrapper = document.createElement('div');
     const title = document.createElement('button');
 
-    wrapper.setAttribute('style', `width: ${width}px; height: ${height}px; position: absolute; top: ${top}px; left: ${left}px; outline: 4px dashed red; margin-top: 0; z-index: 1; box-sizing: border-box; pointer-events: none;`)
+    wrapper.setAttribute('style', `width: ${width}px; height: ${height}px; position: absolute; top: ${top}px; left: ${left}px; ${isSemanticTag ? 'outline: 4px dashed red;' : 'border: 4px solid blue;'} margin-top: 0; z-index: 1; box-sizing: border-box; pointer-events: none; ${isSemanticTag ? '' : 'padding: 4px;'}`)
     
     title.textContent = `${element.tagName}`;
     // if(actionTagList.find(item => item === element.tagName)) {
@@ -133,7 +138,7 @@ const generateArea = (elementInfo) => {
     //           }
     //     }).join(' ');
     // }
-    title.setAttribute('style', `position: absolute; top: 0; left: -4px; margin-top: 0; line-height: 15px; color: #fff; background-color: red; pointer-events: all;`);
+    title.setAttribute('style', `position: absolute; top: ${isSemanticTag ? '-15px' : '0'}; left: -4px; margin-top: 0; line-height: 15px; color: #fff; background-color: ${isSemanticTag ? 'red' : 'blue'}; pointer-events: all;`);
     title.addEventListener('click', () => {
         element.scrollIntoView(true);
     });
@@ -145,7 +150,7 @@ const generateArea = (elementInfo) => {
 const generateOutline = (elementInfoList, tree) => {
     let outLineRoot = document.createElement('div');
     outLineRoot.setAttribute('data-tree-outline', 'root');
-    outLineRoot.setAttribute('style', `width: ${document.body.clientWidth}px; height: ${document.body.clientHeight}px; position: absolute; top: 0; left: 0; border: 4px solid red; margin-top: 0; z-index: 999999; box-sizing: border-box; pointer-events: none;`);
+    outLineRoot.setAttribute('style', `width: ${document.body.clientWidth}px; height: ${document.body.clientHeight}px; position: absolute; top: 0; left: 0; border: 4px solid grey; margin-top: 0; z-index: 999999; box-sizing: border-box; pointer-events: none;`);
     
     if (tree) {
         outLineRoot = tree;
@@ -157,7 +162,7 @@ const generateOutline = (elementInfoList, tree) => {
             return;
         }
         if(elementInfo.children?.length > 0) {
-            generateOutline(elementInfo, area);
+            generateOutline(elementInfo, outLineRoot);
         }
         outLineRoot.appendChild(area);
     });
