@@ -5,8 +5,6 @@ const gridTagList = ['UL',  'LI', 'FORM']
 const actionTagList = ['A', 'BUTTON', 'SELECT', 'LABEL', 'INPUT', 'TEXTAREA'];
 const findTagNameList = [...semanticTagList, ...gridTagList, ...actionTagList];
 
-
-
 function generateChildernList (headingLevel) {
     const listElement = document.createElement('ul');
     listElement.setAttribute('data-heading-level', headingLevel);
@@ -36,6 +34,7 @@ const generateHeadingTree = () => {
     let prevListItemElement = null;
     let currentHeadingLevel = 0;
     listElement.setAttribute('data-heading-level', '1');
+    listElement.setAttribute('id', 'headingTree');
 
     hadingTagList?.forEach((headingTag, index) => {
         const headingLevel = parseInt(headingTag.tagName.replace('H', ''), 10);
@@ -118,6 +117,7 @@ const generateArea = (elementInfo) => {
     const element = elementInfo.target;
     const style = window.getComputedStyle(element);
     let isSemanticTag = false;
+    let color = 'red';
     if (style.display === 'none' || style.visibility === 'hidden') {
         return null;
     }
@@ -125,11 +125,21 @@ const generateArea = (elementInfo) => {
     if (semanticTagList.find(item => item === element.tagName)) {
         isSemanticTag = true;
     }
+
+    if (actionTagList.find(item => item === element.tagName)) {
+        color = 'blue';
+    }
+
+    if (gridTagList.find(item => item === element.tagName)) {
+        color = 'green';
+    }
+
     const { width, height, top, left } = element.getBoundingClientRect();
+    const { offsetTop, offsetLeft } = element;
     const wrapper = document.createElement('div');
     const title = document.createElement('button');
 
-    wrapper.setAttribute('style', `width: ${width}px; height: ${height}px; position: absolute; top: ${top}px; left: ${left}px; ${isSemanticTag ? 'outline: 4px dashed red;' : 'border: 4px solid blue;'} margin-top: 0; z-index: 1; box-sizing: border-box; pointer-events: none; ${isSemanticTag ? '' : 'padding: 4px;'}`)
+    wrapper.setAttribute('style', `width: ${width}px; height: ${height}px; position: absolute; top: ${top}px; left: ${left}px; ${isSemanticTag ? `outline: 4px dashed ${color};` : `border: 4px solid ${color};`} margin-top: 0; z-index: 1; box-sizing: border-box; pointer-events: none; ${isSemanticTag ? '' : 'padding: 4px;'}`)
     
     title.textContent = `${element.tagName}`;
     // if(actionTagList.find(item => item === element.tagName)) {
@@ -139,7 +149,7 @@ const generateArea = (elementInfo) => {
     //           }
     //     }).join(' ');
     // }
-    title.setAttribute('style', `position: absolute; top: ${isSemanticTag ? '-15px' : '0'}; left: -4px; margin-top: 0; line-height: 15px; color: #fff; background-color: ${isSemanticTag ? 'red' : 'blue'}; pointer-events: all;`);
+    title.setAttribute('style', `position: absolute; top: ${isSemanticTag ? '-15px' : '0'}; left: -4px; margin-top: 0; line-height: 15px; color: #fff; background-color: ${color}; pointer-events: all;`);
     title.addEventListener('click', () => {
         element.scrollIntoView(true);
     });
@@ -148,10 +158,12 @@ const generateArea = (elementInfo) => {
     return wrapper;
 }
 
+// TODO: 재귀를 쓰지 않고 for문으로 작성해보기
 const generateOutline = (elementInfoList, tree) => {
+    const { width, height, top, left } = document.body.getBoundingClientRect();
     let outLineRoot = document.createElement('div');
-    outLineRoot.setAttribute('data-tree-outline', 'root');
-    outLineRoot.setAttribute('style', `width: ${document.body.clientWidth}px; height: ${document.body.clientHeight}px; position: absolute; top: 0; left: 0; border: 4px solid grey; margin-top: 0; z-index: 999999; box-sizing: border-box; pointer-events: none;`);
+    outLineRoot.setAttribute('id', 'treeOutline');
+    outLineRoot.setAttribute('style', `position: absolute; z-index: 999998; box-sizing: border-box; pointer-events: none; padding-left: 400px; width: 100vw; height: ${height}px; top: ${top}px; left: 0; overflow: hidden;`);
     
     if (tree) {
         outLineRoot = tree;
@@ -171,16 +183,43 @@ const generateOutline = (elementInfoList, tree) => {
     return outLineRoot;
 };
 
-setTimeout(() => {
-    const headingTree = generateHeadingTree();
-    const TagList = findChildern(document.body, findTagNameList, {
-        target: document.body,
-        tagName: 'BODY',
-        children: [],
-      });
-      console.log('TagList', TagList);
-    const outline = generateOutline(TagList);
+chrome.storage.onChanged.addListener((changes, namespace) => {
+    for (let [key, { oldValue, newValue }] of Object.entries(changes)) {
+      console.log(
+        `Storage key "${key}" in namespace "${namespace}" changed.`,
+        `Old value was "${oldValue}", new value is "${newValue}".`
+      );
+    }
+  });
+
+chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
+    if (msg.action === "semanticHandlerClick") { 
+        chrome.storage.sync.get([msg.storageKey], function(res){
+            const optionData = res[msg.storageKey];
+            if (optionData.isShowController) {
+                const iframe = document.createElement('iframe');
+                iframe.setAttribute('id', 'semanticTreeController');
+                iframe.setAttribute('style', 'width: 400px; height: 100vh; position: fixed; top: 0; left: 0; background-color: #fff; z-index: 999999;');
+                document.body.setAttribute('style', 'width: calc(100% - 400px); height: auto; position: absolute; top: 0; left: 400px;')
+                document.body.parentElement.insertBefore(iframe, document.body);
+                const iframeBody = iframe.contentDocument.body;
+                const headingTree = generateHeadingTree();
+                const tagList = findChildern(document.body, findTagNameList, {
+                    target: document.body,
+                    tagName: 'BODY',
+                    children: [],
+                });
+                const outline = generateOutline(tagList);
     
-    document.body.appendChild(headingTree);
-    document.body.appendChild(outline);
-}, 4000);
+                iframeBody.appendChild(headingTree);
+                document.body.parentElement.appendChild(outline);
+            } else {
+                document.getElementById('semanticTreeController')?.remove();
+                document.getElementById('treeOutline')?.remove();
+                document.body.removeAttribute('style');
+            }
+        });
+     }
+
+     return true;
+});
