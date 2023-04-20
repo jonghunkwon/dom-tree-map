@@ -1,7 +1,6 @@
 const previousScripts = {};
 async function getTabData(storageKey, callback) {
     return chrome.storage.sync.get([storageKey]).then((result) => {
-        console.log('result', result);
         const data = result[storageKey] || {};
         callback(data);
     });
@@ -14,7 +13,6 @@ chrome.action.onClicked.addListener(async (tab) => {
     let optionData = {};
 
     await getTabData(storageKey, (data) => {
-        console.log('data', data);
         optionData = data;
     })
 
@@ -23,8 +21,6 @@ chrome.action.onClicked.addListener(async (tab) => {
             previousScripts[tabId] = true;
         });
     }
-
-    console.log('optionData', optionData);
 
     chrome.storage.sync.set({
         [storageKey]: {
@@ -36,4 +32,37 @@ chrome.action.onClicked.addListener(async (tab) => {
     })
 });
 
+chrome.tabs.onRemoved.addListener(async function(tabId, removeInfo) {
+    const storageKey = `tabStorage-${tabId}`;
+    chrome.storage.sync.set({
+        [storageKey]: {
+            ...optionData,
+            isShowController: false,
+        }
+    }, () => {
+        chrome.tabs.sendMessage(tabId, { action: "semanticHandlerClick", storageKey });
+        delete previousScripts[tabId];
+    })
+    
+});
   
+chrome.tabs.onUpdated.addListener(async function(tabId, changeInfo, tab) {
+    const storageKey = `tabStorage-${tabId}`;
+    let optionData = {};
+
+    await getTabData(storageKey, (data) => {
+        optionData = data;
+    })
+
+    if (changeInfo.status === "complete") {
+        chrome.storage.sync.set({
+            [storageKey]: {
+                ...optionData,
+                isShowController: false,
+            }
+        }, () => {
+            delete previousScripts[tabId];
+        })
+
+    }
+});

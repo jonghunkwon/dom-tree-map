@@ -114,6 +114,7 @@ function findChildern(node, findNodeNameList, result) {
 }
 
 const generateArea = (elementInfo) => {
+    const {scrollY} = window
     const element = elementInfo.target;
     const style = window.getComputedStyle(element);
     let isSemanticTag = false;
@@ -135,11 +136,10 @@ const generateArea = (elementInfo) => {
     }
 
     const { width, height, top, left } = element.getBoundingClientRect();
-    const { offsetTop, offsetLeft } = element;
     const wrapper = document.createElement('div');
     const title = document.createElement('button');
 
-    wrapper.setAttribute('style', `width: ${width}px; height: ${height}px; position: absolute; top: ${top}px; left: ${left}px; ${isSemanticTag ? `outline: 4px dashed ${color};` : `border: 4px solid ${color};`} margin-top: 0; z-index: 1; box-sizing: border-box; pointer-events: none; ${isSemanticTag ? '' : 'padding: 4px;'}`)
+    wrapper.setAttribute('style', `width: ${width}px; height: ${height}px; position: absolute; top: ${top + scrollY}px; left: ${left}px; outline: 4px dashed ${color}; margin-top: 0; z-index: 1; box-sizing: border-box; pointer-events: none; ${isSemanticTag ? '' : 'padding: 4px;'}`)
     
     title.textContent = `${element.tagName}`;
     // if(actionTagList.find(item => item === element.tagName)) {
@@ -163,7 +163,7 @@ const generateOutline = (elementInfoList, tree) => {
     const { width, height, top, left } = document.body.getBoundingClientRect();
     let outLineRoot = document.createElement('div');
     outLineRoot.setAttribute('id', 'treeOutline');
-    outLineRoot.setAttribute('style', `position: absolute; z-index: 999998; box-sizing: border-box; pointer-events: none; padding-left: 400px; width: 100vw; height: ${height}px; top: ${top}px; left: 0; overflow: hidden;`);
+    outLineRoot.setAttribute('style', `position: absolute; z-index: 999998; box-sizing: border-box; pointer-events: none; padding-left: 400px; width: 100vw; height: ${height}px; top: 0; left: 0; overflow: hidden;`);
     
     if (tree) {
         outLineRoot = tree;
@@ -183,38 +183,135 @@ const generateOutline = (elementInfoList, tree) => {
     return outLineRoot;
 };
 
-chrome.storage.onChanged.addListener((changes, namespace) => {
-    for (let [key, { oldValue, newValue }] of Object.entries(changes)) {
-      console.log(
-        `Storage key "${key}" in namespace "${namespace}" changed.`,
-        `Old value was "${oldValue}", new value is "${newValue}".`
-      );
+
+const generateSemanticTreeListItem = (elementInfo) => {
+    const element = elementInfo.target;
+    const style = window.getComputedStyle(element);
+    if (style.display === 'none' || style.visibility === 'hidden') {
+        return null;
     }
-  });
+
+    const wrapper = document.createElement('li');
+    const title = document.createElement('button');
+    
+    title.textContent = `${element.tagName}`;
+    if(actionTagList.find(item => item === element.tagName)) {
+        title.textContent = Array.from(element.childNodes).map((node) => {
+            if (node.nodeType === Node.TEXT_NODE && !node.data.indexOf('\n') > -1) { // 만약 childNode가 text node라면,
+                return node.data;
+              }
+        }).join(' ');
+    }
+    title.addEventListener('click', () => {
+        console.log(element);
+        element.scrollIntoView(true);
+    });
+
+    wrapper.appendChild(title);
+    return wrapper;
+}
+
+// TODO: 재귀를 쓰지 않고 for문으로 작성해보기
+const generateSemanticTree = (elementInfoList, tree) => {
+    let outLineRoot = null;
+    let currentList = null;
+    if (!tree) {
+        outLineRoot = document.createElement('ul');
+        outLineRoot.setAttribute('id', 'semanticTree');
+        currentList = outLineRoot;
+    }
+    
+    if (tree) {
+        currentList = tree;
+    }
+
+    elementInfoList.children?.forEach((elementInfo) => {
+        const listItem = generateSemanticTreeListItem(elementInfo);
+        if(!listItem) {
+            return;
+        }
+        if(elementInfo.children?.length > 0) {
+            const childrenList = document.createElement('ul');
+            listItem.appendChild(childrenList);
+            generateSemanticTree(elementInfo, childrenList);
+        }
+        currentList.appendChild(listItem);
+    });
+
+    return outLineRoot;
+};
+
+const generateWidget = () => {
+    const widget = document.createElement('iframe');
+    widget.setAttribute('id', 'semanticTreeController');
+    widget.setAttribute('style', 'width: 400px; height: 100vh; position: fixed; top: 0; left: 0; background-color: #fff; z-index: 999999;');
+    return widget;
+};
+
+const appendWidget = (widget) => {
+    document.body.setAttribute('style', 'width: calc(100% - 400px); height: auto; position: absolute; top: 0; left: 400px;')
+    document.body.parentElement.insertBefore(widget, document.body);
+};
+
+const headingTreeAppendWidget = (widget) => {
+    const headingTree = generateHeadingTree();
+    const widgetBody = widget.contentDocument.body;
+    widgetBody.appendChild(headingTree);
+};
+
+const semanticTreeAppendWidget = (widget) => {
+    const tagList = findChildern(document.body, findTagNameList, {
+        target: document.body,
+        tagName: 'BODY',
+        children: [],
+    });
+    const semanticTree = generateSemanticTree(tagList);
+    const widgetBody = widget.contentDocument.body;
+    widgetBody.appendChild(semanticTree);
+}
+
+const semanticViewerAppendBody = () => {
+    const tagList = findChildern(document.body, findTagNameList, {
+        target: document.body,
+        tagName: 'BODY',
+        children: [],
+    });
+    const outline = generateOutline(tagList);
+    document.body.parentElement.appendChild(outline);
+}
+
+const appendWidgetHeader = (widget) => {
+    const widgetBody = widget.contentDocument.body;
+
+    const widgetHeader = document.createElement('div');
+    const reloadSemanticViewerButton = document.createElement('button');
+    reloadSemanticViewerButton.textContent = '새로고침';
+    reloadSemanticViewerButton.addEventListener('click', () => {
+        document.getElementById('treeOutline')?.remove();
+        semanticViewerAppendBody();
+    });
+
+    widgetHeader.appendChild(reloadSemanticViewerButton);
+
+    widgetBody.parentElement.insertBefore(widgetHeader, widgetBody);
+}
+
+
 
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
     if (msg.action === "semanticHandlerClick") { 
         chrome.storage.sync.get([msg.storageKey], function(res){
             const optionData = res[msg.storageKey];
+            const semanticTreeController = document.getElementById('semanticTreeController');
             if (optionData.isShowController) {
-                const iframe = document.createElement('iframe');
-                iframe.setAttribute('id', 'semanticTreeController');
-                iframe.setAttribute('style', 'width: 400px; height: 100vh; position: fixed; top: 0; left: 0; background-color: #fff; z-index: 999999;');
-                document.body.setAttribute('style', 'width: calc(100% - 400px); height: auto; position: absolute; top: 0; left: 400px;')
-                document.body.parentElement.insertBefore(iframe, document.body);
-                const iframeBody = iframe.contentDocument.body;
-                const headingTree = generateHeadingTree();
-                const tagList = findChildern(document.body, findTagNameList, {
-                    target: document.body,
-                    tagName: 'BODY',
-                    children: [],
-                });
-                const outline = generateOutline(tagList);
-    
-                iframeBody.appendChild(headingTree);
-                document.body.parentElement.appendChild(outline);
+                const widget = generateWidget();
+                appendWidget(widget);
+                headingTreeAppendWidget(widget);
+                appendWidgetHeader(widget);
+                semanticTreeAppendWidget(widget);
+                semanticViewerAppendBody();
             } else {
-                document.getElementById('semanticTreeController')?.remove();
+                semanticTreeController?.remove();
                 document.getElementById('treeOutline')?.remove();
                 document.body.removeAttribute('style');
             }
