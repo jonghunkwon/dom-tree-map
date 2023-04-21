@@ -113,7 +113,7 @@ function findChildern(node, findNodeNameList, result) {
     return currentReslut;
 }
 
-const generateArea = (elementInfo) => {
+const generateArea = (elementInfo, index) => {
     const {scrollY} = window
     const element = elementInfo.target;
     const style = window.getComputedStyle(element);
@@ -141,7 +141,7 @@ const generateArea = (elementInfo) => {
 
     wrapper.setAttribute('style', `width: ${width}px; height: ${height}px; position: absolute; top: ${top + scrollY}px; left: ${left}px; outline: 4px dashed ${color}; margin-top: 0; z-index: 1; box-sizing: border-box; pointer-events: none; ${isSemanticTag ? '' : 'padding: 4px;'}`)
     
-    title.textContent = `${element.tagName}`;
+    title.textContent = `${index}`;
     // if(actionTagList.find(item => item === element.tagName)) {
     //     title.textContent = Array.from(element.childNodes).map((node) => {
     //         if (node.nodeType === Node.TEXT_NODE && !node.data.indexOf('\n') > -1) { // 만약 childNode가 text node라면,
@@ -149,6 +149,15 @@ const generateArea = (elementInfo) => {
     //           }
     //     }).join(' ');
     // }
+
+    if (semanticTagList.find(item => item === element.tagName)) {
+        const semanticTagChildren = Array.from(element?.children);
+        const headingTag = semanticTagChildren?.find(semanticTag => findHeadingTagNameList.join(',').indexOf(semanticTag.tagName) > -1);
+        if(headingTag) {
+            title.textContent = `${index}: ${headingTag.textContent}`;
+        }
+    }
+
     title.setAttribute('style', `position: absolute; top: ${isSemanticTag ? '-15px' : '0'}; left: -4px; margin-top: 0; line-height: 15px; color: #fff; background-color: ${color}; pointer-events: all;`);
     title.addEventListener('click', () => {
         element.scrollIntoView(true);
@@ -159,7 +168,7 @@ const generateArea = (elementInfo) => {
 }
 
 // TODO: 재귀를 쓰지 않고 for문으로 작성해보기
-const generateOutline = (elementInfoList, tree) => {
+const generateOutline = (elementInfoList, tree, parentIndex = 1) => {
     const { width, height, top, left } = document.body.getBoundingClientRect();
     let outLineRoot = document.createElement('div');
     outLineRoot.setAttribute('id', 'treeOutline');
@@ -169,13 +178,13 @@ const generateOutline = (elementInfoList, tree) => {
         outLineRoot = tree;
     }
 
-    elementInfoList.children?.forEach((elementInfo) => {
-        const area = generateArea(elementInfo);
+    elementInfoList.children?.forEach((elementInfo, index) => {
+        const area = generateArea(elementInfo, `${parentIndex}.${index + 1}`);
         if(!area) {
             return;
         }
         if(elementInfo.children?.length > 0) {
-            generateOutline(elementInfo, outLineRoot);
+            generateOutline(elementInfo, outLineRoot, parentIndex + 1);
         }
         outLineRoot.appendChild(area);
     });
@@ -184,7 +193,7 @@ const generateOutline = (elementInfoList, tree) => {
 };
 
 
-const generateSemanticTreeListItem = (elementInfo) => {
+const generateSemanticTreeListItem = (elementInfo, index) => {
     const element = elementInfo.target;
     const style = window.getComputedStyle(element);
     if (style.display === 'none' || style.visibility === 'hidden') {
@@ -194,14 +203,31 @@ const generateSemanticTreeListItem = (elementInfo) => {
     const wrapper = document.createElement('li');
     const title = document.createElement('button');
     
-    title.textContent = `${element.tagName}`;
-    if(actionTagList.find(item => item === element.tagName)) {
-        title.textContent = Array.from(element.childNodes).map((node) => {
-            if (node.nodeType === Node.TEXT_NODE && !node.data.indexOf('\n') > -1) { // 만약 childNode가 text node라면,
-                return node.data;
-              }
-        }).join(' ');
+    title.textContent = `${index}: ${element.tagName}`;
+    // if(actionTagList.find(item => item === element.tagName)) {
+    //     title.textContent = Array.from(element.childNodes).map((node) => {
+    //         if (node.nodeType === Node.TEXT_NODE && !node.data.indexOf('\n') > -1) { // 만약 childNode가 text node라면,
+    //             return node.data;
+    //           }
+    //     }).join(' ');
+    // }
+
+    if (element.getAttribute('aria-label')) {
+        title.textContent = `${index}: ${element.getAttribute('aria-label')}[${element.tagName}]`;
     }
+
+    if (element.tagName === 'LABEL') {
+        title.textContent = `${index}: ${element.textContent}[${element.tagName}]`;
+    }
+
+    if ([...semanticTagList].find(item => item === element.tagName)) {
+        const semanticTagChildren = Array.from(element?.children);
+        const headingTag = semanticTagChildren?.find(semanticTag => findHeadingTagNameList.join(',').indexOf(semanticTag.tagName) > -1);
+        if(headingTag) {
+            title.textContent = `${index}: ${headingTag.textContent}[${element.tagName}]`;
+        }
+    }
+
     title.addEventListener('click', () => {
         console.log(element);
         element.scrollIntoView(true);
@@ -212,12 +238,13 @@ const generateSemanticTreeListItem = (elementInfo) => {
 }
 
 // TODO: 재귀를 쓰지 않고 for문으로 작성해보기
-const generateSemanticTree = (elementInfoList, tree) => {
+const generateSemanticTree = (elementInfoList, tree, parentIndex = 1) => {
     let outLineRoot = null;
     let currentList = null;
     if (!tree) {
         outLineRoot = document.createElement('ul');
         outLineRoot.setAttribute('id', 'semanticTree');
+        outLineRoot.setAttribute('style', 'margin-top: 50px; padding-top: 50px; border-top: 2px solid red');
         currentList = outLineRoot;
     }
     
@@ -225,15 +252,15 @@ const generateSemanticTree = (elementInfoList, tree) => {
         currentList = tree;
     }
 
-    elementInfoList.children?.forEach((elementInfo) => {
-        const listItem = generateSemanticTreeListItem(elementInfo);
+    elementInfoList.children?.forEach((elementInfo, index) => {
+        const listItem = generateSemanticTreeListItem(elementInfo, `${parentIndex}.${index + 1}`);
         if(!listItem) {
             return;
         }
         if(elementInfo.children?.length > 0) {
             const childrenList = document.createElement('ul');
             listItem.appendChild(childrenList);
-            generateSemanticTree(elementInfo, childrenList);
+            generateSemanticTree(elementInfo, childrenList, parentIndex + 1);
         }
         currentList.appendChild(listItem);
     });
