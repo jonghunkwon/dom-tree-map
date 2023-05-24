@@ -1,0 +1,19 @@
+{
+    "manifest_version": 3,
+    "name": "Hello Extensions",
+    "description": "Base Level Extension",
+    "version": "1.0.1",
+    "permissions": [
+        "tabs",
+        "activeTab",
+        "scripting",
+        "storage"
+      ],
+      "action": {
+        "default_title": "Click Me"
+    },
+    "background": {
+        "service_worker": "background.js",
+        "type": "module"
+    }
+}
